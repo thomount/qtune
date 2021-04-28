@@ -143,6 +143,7 @@ class Database:
                 cursor.execute(sql)
                 # result = cursor.fetchall()
             # connection.commit()
+            return 1
 
 # Define the environment
 class Environment(gym.Env):
@@ -156,6 +157,7 @@ class Environment(gym.Env):
         self.state_num = db.internal_metric_num
         self.action_num = db.knob_num
         self.benchmark = argus['benchmark']
+        self.score = 0
 
         ''' observation dim = system metric dim + query vector dim '''
         self.o_dim = db.internal_metric_num + len(self.parser.predict_sql_resource()[0])
@@ -247,7 +249,11 @@ class Environment(gym.Env):
 
     # new_state, reward, done,
     def step(self, u, isPredicted, iteration):
-        self.db.change_knob_nonrestart(u)
+        flag = self.db.change_knob_nonrestart(u)
+
+        # if failing to tune knobs, give a high panlty
+        if not flag:
+            return self.state, -10e+4, False, self.score, {}
 
         # 1 run sysbench
         # primary key lookup
@@ -326,6 +332,7 @@ class Environment(gym.Env):
             rl = 0
 
         reward = 6 * rl + 4 * rt
+
         '''
         reward = 0
         for i in range(u.shape[0]):
@@ -349,6 +356,9 @@ class Environment(gym.Env):
             self.pfs = open('training-results/rw_predict_2', 'a')
             self.pfs.write("%d\t%f\t%f\n" % (iteration, throughput, latency))
             self.pfs.close()
+
+            self.score = self.score + reward
+
         else:
             print("Random %d\t%f\t%f\t%f\t%ds" % (len(self.mem) + 1, throughput, latency, reward, interval))
 
@@ -356,7 +366,7 @@ class Environment(gym.Env):
             self.rfs.write("%d\t%f\t%f\n" % (iteration, throughput, latency))
             self.rfs.close()
 
-        return self.state, reward, False, {}
+        return self.state, reward, False, self.score, {}
 
     def _get_obs(self):
         self.state = self.db.fetch_internal_metrics()
