@@ -15,6 +15,8 @@ from sql2resource import SqlParser
 
 from configs import knob_config
 
+import time
+
 # fetch all the knobs from the prepared configuration info
 
 
@@ -157,9 +159,11 @@ class Environment(gym.Env):
         self.state_num = db.internal_metric_num
         self.action_num = db.knob_num
         self.benchmark = argus['benchmark']
-        self.score = 0
+        self.timestamp = int(time.time())
 
         ''' observation dim = system metric dim + query vector dim '''
+        self.score = 0 # accumulate rewards
+
         self.o_dim = db.internal_metric_num + len(self.parser.predict_sql_resource()[0])
         # print(db.internal_metric_num, self.parser.predict_sql_resource())
         self.o_low = np.array([-1e+10]*self.o_dim)
@@ -353,7 +357,7 @@ class Environment(gym.Env):
             # print(self.predicted_mem)
             print("Predict %d\t%f\t%f\t%f\t%ds" % (len(self.mem) + 1, throughput, latency, reward, interval))
 
-            self.pfs = open('training-results/rw_predict_2', 'a')
+            self.pfs = open('training-results/res_predict-'+str(self.timestamp), 'a')
             self.pfs.write("%d\t%f\t%f\n" % (iteration, throughput, latency))
             self.pfs.close()
 
@@ -362,7 +366,7 @@ class Environment(gym.Env):
         else:
             print("Random %d\t%f\t%f\t%f\t%ds" % (len(self.mem) + 1, throughput, latency, reward, interval))
 
-            self.rfs = open('training-results/rw_random_2', 'a')
+            self.rfs = open('training-results/res_random-'+str(self.timestamp), 'a')
             self.rfs.write("%d\t%f\t%f\n" % (iteration, throughput, latency))
             self.rfs.close()
 
